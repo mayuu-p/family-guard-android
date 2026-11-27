@@ -21,8 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Prepare site root
+        run: |
+          mkdir -p site
+          cp browser/index.html site/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: browser
+          path: site
       - id: deployment
         uses: actions/deploy-pages@v4
