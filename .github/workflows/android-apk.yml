@@ -42,3 +42,5 @@ jobs:
         with:
           name: family-guard-debug-apk
           path: unpacked/family_guard_android/mobile/build/app/outputs/flutter-apk/app-debug.apk
+
+# Rebuild after fixing child location upload timing.
