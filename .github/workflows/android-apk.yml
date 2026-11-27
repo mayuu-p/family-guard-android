@@ -29,6 +29,26 @@ jobs:
         working-directory: unpacked/family_guard_android/mobile
         run: flutter create --platforms=android .
 
+      - name: Add Android runtime location permissions
+        working-directory: unpacked/family_guard_android/mobile
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          permissions = [
+              '    <uses-permission android:name="android.permission.INTERNET"/>',
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>',
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>',
+          ]
+          missing = [x for x in permissions if x.split('android:name="')[1].split('"')[0] not in s]
+          if missing:
+              s = s.replace('<application', '\\n'.join(missing) + '\\n    <application', 1)
+          p.write_text(s)
+          print("Manifest now declares internet + foreground coarse/fine location permissions.")
+          PY
+
       - name: Configure Android 10–16 SDK compatibility
         working-directory: unpacked/family_guard_android/mobile
         shell: bash
