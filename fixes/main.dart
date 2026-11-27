@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:http/http.dart' as http;
 
@@ -98,15 +97,87 @@ class _ChildScreenState extends State<ChildScreen>{
   ]));}
 class ParentScreen extends StatefulWidget{const ParentScreen({super.key});@override State<ParentScreen> createState()=>_ParentScreenState();}
 class _ParentScreenState extends State<ParentScreen>{
-  Timer? timer;LatLng? child;List<LatLng> path=[];String status='Loading family status...';final name=TextEditingController();final radius=TextEditingController(text:'150');
-  @override void initState(){super.initState();load();timer=Timer.periodic(const Duration(seconds:15),(_)=>load());}
-  Future<void> load()async{try{final s=await Api().request('/api/family/status');if(s['linked']!=true){setState(()=>status='No child linked. Generate a pairing code from the parent account.');return;}if(s['child']['sharingEnabled']!=true){setState(()=>status='Your child has paused location sharing.');return;}final r=await Api().request('/api/family/child/location');final loc=r['location'];if(loc==null){setState(()=>status='Waiting for the first location update');return;}final point=LatLng((loc['latitude'] as num).toDouble(),(loc['longitude'] as num).toDouble());setState(() { child=point; path=[...path,point]; status='Last updated: ${loc['recorded_at']}'; });}catch(e){setState(()=>status='$e');}}
-  Future<void> createCode()async{try{final r=await Api().request('/api/family/pairing-code',method:'POST');if(mounted)showDialog(context:context,builder:(_)=>AlertDialog(title:const Text('Pairing code'),content:SelectableText('${r['code']}\nExpires in 15 minutes. Share privately with the child.'),actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))]));}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}}
-  Future<void> addFence()async{if(child==null){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Wait for a child location first')));return;}try{await Api().request('/api/geofences',method:'POST',body:{'name':name.text.trim().isEmpty?'Safe Zone':name.text.trim(),'latitude':child!.latitude,'longitude':child!.longitude,'radiusM':int.tryParse(radius.text)??150});if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Safe zone created')));}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}}
+  Timer? timer;
+  double? latitude,longitude;
+  String status='Loading family status...';
+  final name=TextEditingController();
+  final radius=TextEditingController(text:'150');
+  bool loading=false;
+  @override void initState(){super.initState();load();timer=Timer.periodic(const Duration(seconds:20),(_)=>load());}
+  Future<void> load() async {
+    if(loading)return;
+    loading=true;
+    try {
+      final s=await Api().request('/api/family/status');
+      if(!mounted)return;
+      if(s['linked']!=true){setState(()=>status='No child linked. Generate a pairing code and link the child device.');return;}
+      final childInfo=s['child'];
+      if(childInfo is! Map || childInfo['sharingEnabled']!=true){setState(()=>status='Your child has paused location sharing.');return;}
+      final r=await Api().request('/api/family/child/location');
+      final loc=r['location'];
+      if(loc==null){setState(()=>status='Waiting for the child’s first location update.');return;}
+      setState(() {
+        latitude=(loc['latitude'] as num).toDouble();
+        longitude=(loc['longitude'] as num).toDouble();
+        status='Last updated: ${loc['recorded_at']}';
+      });
+    } catch(e) {
+      if(mounted)setState(()=>status=e.toString().replaceFirst('Exception: ',''));
+    } finally { loading=false; }
+  }
+  Future<void> createCode()async{
+    try{
+      final r=await Api().request('/api/family/pairing-code',method:'POST');
+      if(!mounted)return;
+      showDialog(context:context,builder:(_)=>AlertDialog(
+        title:const Text('Parent pairing code'),
+        content:SelectableText('${r['code']}\\nExpires in 15 minutes. Share privately with the child.'),
+        actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Close'))]));
+    }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}
+  }
+  Future<void> addFence()async{
+    if(latitude==null||longitude==null){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('A child location is not available yet.')));return;}
+    try{
+      await Api().request('/api/geofences',method:'POST',body:{
+        'name':name.text.trim().isEmpty?'Safe Zone':name.text.trim(),
+        'latitude':latitude,'longitude':longitude,'radiusM':int.tryParse(radius.text)??150});
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Safe zone saved.')));
+    }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}
+  }
   @override void dispose(){timer?.cancel();name.dispose();radius.dispose();super.dispose();}
-  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Parent Dashboard'),actions:[IconButton(onPressed:()async{await storage.deleteAll();if(mounted)Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder:(_)=>const Gate()),(_)=>false);},icon:const Icon(Icons.logout))]),body:Column(children:[
-    Expanded(child:GoogleMap(initialCameraPosition:CameraPosition(target:child??const LatLng(19.0760,72.8777),zoom:12),markers:child==null?{}:{Marker(markerId:const MarkerId('child'),position:child!,infoWindow:const InfoWindow(title:'Linked child'))},polylines:path.length<2?{}:{Polyline(polylineId:const PolylineId('path'),points:path,width:4)})),
-    Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[Text(status),const SizedBox(height:8),Row(children:[Expanded(child:OutlinedButton.icon(onPressed:createCode,icon:const Icon(Icons.link),label:const Text('Pair child'))),const SizedBox(width:8),Expanded(child:OutlinedButton.icon(onPressed:load,icon:const Icon(Icons.refresh),label:const Text('Refresh')))]),const Divider(),const Text('Create a safe zone at the child’s current location'),TextField(controller:name,decoration:const InputDecoration(labelText:'Zone name')),TextField(controller:radius,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Radius in metres (50–10000)')),const SizedBox(height:8),FilledButton(onPressed:addFence,child:const Text('Create safe zone'))]))
-  ]));}
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('Parent Dashboard'),actions:[
+      IconButton(onPressed:()async{timer?.cancel();await storage.deleteAll();if(mounted)Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder:(_)=>const Gate()),(_)=>false);},icon:const Icon(Icons.logout))
+    ]),
+    body:ListView(padding:const EdgeInsets.all(16),children:[
+      Card(child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        const Row(children:[Icon(Icons.location_on,color:Colors.blue),SizedBox(width:8),Text('Child location',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold))]),
+        const SizedBox(height:12),
+        Text(status),
+        if(latitude!=null&&longitude!=null) ...[
+          const SizedBox(height:12),
+          SelectableText('Latitude: ${latitude!.toStringAsFixed(6)}\\nLongitude: ${longitude!.toStringAsFixed(6)}'),
+          const SizedBox(height:6),
+          const Text('Location updates refresh every 20 seconds while the dashboard is open.',style:TextStyle(color:Colors.grey))
+        ],
+        const SizedBox(height:12),
+        Row(children:[
+          Expanded(child:OutlinedButton.icon(onPressed:createCode,icon:const Icon(Icons.link),label:const Text('Pair child'))),
+          const SizedBox(width:8),
+          Expanded(child:OutlinedButton.icon(onPressed:load,icon:const Icon(Icons.refresh),label:const Text('Refresh')))
+        ])
+      ]))),
+      const SizedBox(height:12),
+      Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+        const Text('Safe zone',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
+        const SizedBox(height:8),
+        const Text('Create a safe zone around the child’s latest shared location.'),
+        TextField(controller:name,decoration:const InputDecoration(labelText:'Zone name')),
+        TextField(controller:radius,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Radius in metres (50–10000)')),
+        const SizedBox(height:8),
+        FilledButton(onPressed:addFence,child:const Text('Create safe zone'))
+      ])))
+    ])
+  );
+}
 
-// Rebuild trigger: Family Guard API points to Mayur-System.
