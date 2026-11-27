@@ -22,10 +22,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - name: Prepare site root
+      - name: Prepare site
         run: |
           mkdir -p site
-          cp index.html site/index.html
+          cp index.html browser/parent.html browser/child.html site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
