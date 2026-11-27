@@ -1,0 +1,44 @@
+
+name: Build Family Guard APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'family_guard_android_source.zip'
+      - '.github/workflows/android-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Extract source
+        run: |
+          unzip -q family_guard_android_source.zip -d unpacked
+
+      - name: Generate Android project
+        working-directory: unpacked/family_guard_android/mobile
+        run: flutter create --platforms=android .
+
+      - name: Get dependencies
+        working-directory: unpacked/family_guard_android/mobile
+        run: flutter pub get
+
+      - name: Build APK
+        working-directory: unpacked/family_guard_android/mobile
+        run: flutter build apk --debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: family-guard-debug-apk
+          path: unpacked/family_guard_android/mobile/build/app/outputs/flutter-apk/app-debug.apk
