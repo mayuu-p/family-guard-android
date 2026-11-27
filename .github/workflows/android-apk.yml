@@ -1,4 +1,4 @@
-name: Build Family Guard APK
+name: Build Family Guard APK (Android 10–16)
 
 on:
   workflow_dispatch:
@@ -29,6 +29,29 @@ jobs:
         working-directory: unpacked/family_guard_android/mobile
         run: flutter create --platforms=android .
 
+      - name: Configure Android 10–16 SDK compatibility
+        working-directory: unpacked/family_guard_android/mobile
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle.kts")
+          if p.exists():
+              s = p.read_text()
+              s = s.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 36")
+              s = s.replace("minSdk = flutter.minSdkVersion", "minSdk = 29")
+              s = s.replace("targetSdk = flutter.targetSdkVersion", "targetSdk = 36")
+              p.write_text(s)
+          else:
+              p = Path("android/app/build.gradle")
+              s = p.read_text()
+              s = s.replace("compileSdkVersion flutter.compileSdkVersion", "compileSdkVersion 36")
+              s = s.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 29")
+              s = s.replace("targetSdkVersion flutter.targetSdkVersion", "targetSdkVersion 36")
+              p.write_text(s)
+          print("Configured minSdk 29, compileSdk/targetSdk 36.")
+          PY
+
       - name: Get dependencies
         working-directory: unpacked/family_guard_android/mobile
         run: flutter pub get
@@ -40,7 +63,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: family-guard-debug-apk
+          name: family-guard-android-10-to-16
           path: unpacked/family_guard_android/mobile/build/app/outputs/flutter-apk/app-debug.apk
-
-# Rebuild after fixing child location upload timing.
