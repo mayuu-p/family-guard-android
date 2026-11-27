@@ -5,6 +5,8 @@ on:
     paths:
       - 'browser/**'
       - 'index.html'
+      - 'parent.html'
+      - 'child.html'
       - '.github/workflows/deploy-browser.yml'
 permissions:
   contents: read
@@ -25,7 +27,7 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p site
-          cp index.html browser/parent.html browser/child.html site/
+          cp index.html parent.html child.html site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
