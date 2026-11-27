@@ -1,5 +1,3 @@
-# Triggering Android APK cloud build
-
 name: Build Family Guard APK
 
 on:
@@ -7,12 +5,12 @@ on:
   push:
     paths:
       - 'family_guard_android_source.zip'
-      - '.github/workflows/android-apk.yml'\n      - 'fixes/main.dart'
+      - '.github/workflows/android-apk.yml'
+      - 'fixes/main.dart'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,7 +22,8 @@ jobs:
 
       - name: Extract source
         run: |
-          unzip -q family_guard_android_source.zip -d unpacked\n          cp fixes/main.dart unpacked/family_guard_android/mobile/lib/main.dart
+          unzip -q family_guard_android_source.zip -d unpacked
+          cp fixes/main.dart unpacked/family_guard_android/mobile/lib/main.dart
 
       - name: Generate Android project
         working-directory: unpacked/family_guard_android/mobile
