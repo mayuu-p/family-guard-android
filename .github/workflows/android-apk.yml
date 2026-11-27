@@ -7,7 +7,7 @@ on:
   push:
     paths:
       - 'family_guard_android_source.zip'
-      - '.github/workflows/android-apk.yml'
+      - '.github/workflows/android-apk.yml'\n      - 'fixes/main.dart'
 
 jobs:
   build:
@@ -24,7 +24,7 @@ jobs:
 
       - name: Extract source
         run: |
-          unzip -q family_guard_android_source.zip -d unpacked
+          unzip -q family_guard_android_source.zip -d unpacked\n          cp fixes/main.dart unpacked/family_guard_android/mobile/lib/main.dart
 
       - name: Generate Android project
         working-directory: unpacked/family_guard_android/mobile
